@@ -1,0 +1,69 @@
+# Real-Time Web Application Server Health Monitoring Using MongoDB
+# Start everything with:  docker compose up --build -d
+name: server-health-monitoring
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: server-health-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME:-server_health_monitoring}
+    # Port 27017 is intentionally NOT published to the host.
+    # MongoDB is reachable only on the Docker network (hostname "mongodb")
+    # and through "docker exec ... mongosh" for CLI access.
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - health-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  backend:
+    build:
+      context: ./backend
+    container_name: server-health-backend
+    restart: unless-stopped
+    environment:
+      PORT: 5000
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongodb:27017/server_health_monitoring}
+      MONGO_DB_NAME: ${MONGO_DB_NAME:-server_health_monitoring}
+      CPU_THRESHOLD: ${CPU_THRESHOLD:-80}
+      AUTO_SEED: ${AUTO_SEED:-true}
+    ports:
+      - "${BACKEND_PORT:-5000}:5000"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - health-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:5000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: server-health-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - health-net
+
+volumes:
+  mongodb_data:
+
+networks:
+  health-net:
+    driver: bridge

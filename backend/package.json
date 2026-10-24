@@ -1,0 +1,15 @@
+{
+  "name": "server-health-backend",
+  "version": "1.0.0",
+  "description": "Express API for Real-Time Web Application Server Health Monitoring Using MongoDB",
+  "main": "src/server.js",
+  "private": true,
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "cors": "2.8.5",
+    "express": "4.21.2",
+    "mongodb": "6.12.0"
+  }
+}
